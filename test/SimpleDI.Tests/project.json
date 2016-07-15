@@ -1,0 +1,21 @@
+{
+  "version": "1.0.0-*",
+  "dependencies": {
+    "dotnet-test-xunit": "2.2.0-*",
+    "SimpleDI": "1.0.0-*",
+    "Microsoft.Extensions.DependencyInjection.Specification.Tests": "1.0.0-*",
+    "xunit": "2.2.0-*"
+  },
+  "frameworks": {
+    "netcoreapp1.0": {
+      "dependencies": {
+        "Microsoft.NETCore.App": {
+          "version": "1.0.0-*",
+          "type": "platform"
+        }
+      }
+    },
+    "net451": {}
+  },
+  "testRunner": "xunit"
+}
