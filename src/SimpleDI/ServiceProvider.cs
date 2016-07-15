@@ -30,12 +30,13 @@ namespace SimpleDI
 
         public object GetService(Type serviceType)
         {
-            if (serviceType == typeof(IServiceScopeFactory))
+            if (serviceType == typeof(IServiceProvider) ||
+                serviceType == typeof(IServiceScopeFactory))
             {
                 return this;
             }
 
-            var descriptor = _services.FirstOrDefault(service => service.ServiceType == serviceType);
+            var descriptor = _services.LastOrDefault(service => service.ServiceType == serviceType);
             if (descriptor == null)
             {
                 if (serviceType.IsConstructedGenericType)
