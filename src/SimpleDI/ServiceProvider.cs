@@ -41,6 +41,18 @@ namespace SimpleDI
                 if (serviceType.IsConstructedGenericType)
                 {
                     var genericType = serviceType.GetGenericTypeDefinition();
+                    if (genericType == typeof(IEnumerable<>))
+                    {
+                        var genericAgument = serviceType.GenericTypeArguments[0];
+                        var descriptors = _services.Where(service => service.ServiceType == genericAgument).ToList();
+                        var array = Array.CreateInstance(genericAgument, descriptors.Count());
+                        for (int i = 0; i < array.Length; i++)
+                        {
+                            array.SetValue(Resolve(descriptors[i], descriptors[i].ServiceType, null), i);
+                        }
+                        return array;
+                    }
+
                     descriptor = _services.FirstOrDefault(service => service.ServiceType == genericType);
                     if (descriptor != null)
                     {
