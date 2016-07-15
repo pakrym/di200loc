@@ -7,6 +7,6 @@ namespace SimpleDI.Tests
     public class SimpleDISpecificationTests : DependencyInjectionSpecificationTests
     {
         protected override IServiceProvider CreateServiceProvider(IServiceCollection collection) =>
-            new ServiceProvider();
+            new ServiceProvider(collection);
     }
 }
