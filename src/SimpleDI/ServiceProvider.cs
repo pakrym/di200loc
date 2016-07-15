@@ -6,23 +6,82 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace SimpleDI
 {
-    public class ServiceProvider : IServiceProvider
+    public class ServiceProvider : IServiceProvider, IServiceScopeFactory, IDisposable
     {
+        private readonly Dictionary<Type, object> _scoped = new Dictionary<Type, object>();
+        private readonly List<object> _transient = new List<object>();
+
         private readonly ServiceDescriptor[] _services;
+        private readonly ServiceProvider _root;
+
+        private bool _disposed;
 
         public ServiceProvider(IEnumerable<ServiceDescriptor> services)
         {
             _services = services.ToArray();
+            _root = this;
+        }
+
+        public ServiceProvider(ServiceProvider parent)
+        {
+            _services = parent._services;
+            _root = parent._root;
         }
 
         public object GetService(Type serviceType)
         {
+            if (serviceType == typeof(IServiceScopeFactory))
+            {
+                return this;
+            }
+
             var descriptor = _services.FirstOrDefault(service => service.ServiceType == serviceType);
             if (descriptor == null)
             {
                 return null;
             }
+            switch (descriptor.Lifetime)
+            {
+                case ServiceLifetime.Singleton:
+                    return Singleton(serviceType, () => Create(descriptor));
+                case ServiceLifetime.Scoped:
+                    return Scoped(serviceType, () => Create(descriptor));
+                case ServiceLifetime.Transient:
+                    return Transient(Create(descriptor));
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+        }
 
+        private object Transient(object o)
+        {
+            _transient.Add(o);
+            return o;
+        }
+
+        private object Singleton(Type type, Func<object> factory)
+        {
+            return Scoped(type, factory, _root);
+        }
+
+        private object Scoped(Type type, Func<object> factory)
+        {
+            return Scoped(type, factory, this);
+        }
+
+        private static object Scoped(Type type, Func<object> factory, ServiceProvider provider)
+        {
+            object value;
+            if (!provider._scoped.TryGetValue(type, out value))
+            {
+                value = factory();
+                provider._scoped.Add(type, value);
+            }
+            return value;
+        }
+
+        private object Create(ServiceDescriptor descriptor)
+        {
             if (descriptor.ImplementationInstance != null)
             {
                 return descriptor.ImplementationInstance;
@@ -37,6 +96,23 @@ namespace SimpleDI
             }
             // we should never get here
             throw new NotImplementedException();
+        }
+
+        public void Dispose()
+        {
+            if (!_disposed)
+            {
+                _disposed = true;
+                foreach (var o in _transient.Concat(_scoped.Values))
+                {
+                    (o as IDisposable)?.Dispose();
+                }
+            }
+        }
+
+        public IServiceScope CreateScope()
+        {
+            return new ServiceScope(new ServiceProvider(this));
         }
 
         private object CreateInstance(Type implementationType)
