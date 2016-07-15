@@ -38,16 +38,30 @@ namespace SimpleDI
             var descriptor = _services.FirstOrDefault(service => service.ServiceType == serviceType);
             if (descriptor == null)
             {
+                if (serviceType.IsConstructedGenericType)
+                {
+                    var genericType = serviceType.GetGenericTypeDefinition();
+                    descriptor = _services.FirstOrDefault(service => service.ServiceType == genericType);
+                    if (descriptor != null)
+                    {
+                        return Resolve(descriptor, serviceType, serviceType.GenericTypeArguments);
+                    }
+                }
                 return null;
             }
+            return Resolve(descriptor, serviceType, null);
+        }
+
+        private object Resolve(ServiceDescriptor descriptor, Type serviceType, Type[] typeArguments)
+        {
             switch (descriptor.Lifetime)
             {
                 case ServiceLifetime.Singleton:
-                    return Singleton(serviceType, () => Create(descriptor));
+                    return Singleton(serviceType, () => Create(descriptor, typeArguments));
                 case ServiceLifetime.Scoped:
-                    return Scoped(serviceType, () => Create(descriptor));
+                    return Scoped(serviceType, () => Create(descriptor, typeArguments));
                 case ServiceLifetime.Transient:
-                    return Transient(Create(descriptor));
+                    return Transient(Create(descriptor, typeArguments));
                 default:
                     throw new ArgumentOutOfRangeException();
             }
@@ -80,7 +94,7 @@ namespace SimpleDI
             return value;
         }
 
-        private object Create(ServiceDescriptor descriptor)
+        private object Create(ServiceDescriptor descriptor, Type[] typeArguments)
         {
             if (descriptor.ImplementationInstance != null)
             {
@@ -92,7 +106,7 @@ namespace SimpleDI
             }
             else if (descriptor.ImplementationType != null)
             {
-                return CreateInstance(descriptor.ImplementationType);
+                return CreateInstance(descriptor.ImplementationType, typeArguments);
             }
             // we should never get here
             throw new NotImplementedException();
@@ -115,11 +129,14 @@ namespace SimpleDI
             return new ServiceScope(new ServiceProvider(this));
         }
 
-        private object CreateInstance(Type implementationType)
+        private object CreateInstance(Type implementationType, Type[] typeArguments)
         {
-            var constructors = implementationType.GetTypeInfo().
-                DeclaredConstructors.OrderByDescending(c => c.GetParameters().Length);
-
+            if (typeArguments != null)
+            {
+                implementationType = implementationType.MakeGenericType(typeArguments);
+            }
+            var constructors = implementationType.GetTypeInfo()
+                .DeclaredConstructors.OrderByDescending(c => c.GetParameters().Length);
             foreach (var constructorInfo in constructors)
             {
                 var parameters = constructorInfo.GetParameters();
